@@ -25,22 +25,22 @@ variable "defaults" {
 
 variable "hostnames" {
   default = {
-    "0"         = "compass-int-graphite-worker-01"
+    "0"         = "compass-int-poc-worker-01"
     "0.region"  = "amers1"
     "0.zone"    = "a"
-    "1"         = "compass-int-graphite-worker-02"
+    "1"         = "compass-int-poc-worker-02"
     "1.region"  = "amers1"
     "1.zone"    = "b"
-    "2"         = "compass-int-graphite-worker-03"
+    "2"         = "compass-int-poc-worker-03"
     "2.region"  = "amers1"
     "2.zone"    = "a"
-    "3"         = "compass-int-graphite-worker-04"
+    "3"         = "compass-int-poc-worker-04"
     "3.region"  = "amers1"
     "3.zone"    = "b"
-    "4"         = "compass-int-graphite-worker-05"
+    "4"         = "compass-int-poc-worker-05"
     "4.region"  = "amers1"
     "4.zone"    = "a"
-    "5"         = "compass-int-graphite-worker-06"
+    "5"         = "compass-int-poc-worker-06"
     "5.region"  = "amers1"
     "5.zone"    = "b"
   }
@@ -111,7 +111,7 @@ resource "openstack_networking_floatingip_v2" "lbaas_floatip_1" {
 }
 
 resource "openstack_lb_vip_v1" "lbaas_vip_1" {
-  name = "graphite_webapp_vip"
+  name = "poc_webapp_vip"
   region = "${lookup(var.defaults, "region")}"
   subnet_id = "${lookup(var.defaults, "lbaas_subnet")}"
   protocol = "HTTP"
