@@ -1,6 +1,6 @@
 provider "openstack" {
-    user_name  = "8011868"
-    tenant_name = "F&R Platform Management Tools"
-    password  = "Infologo2006"
-    auth_url  = "http://identity-cis-trcloud.int.thomsonreuters.com:5000/v2.0"
+    user_name  = "${lookup(var.openstack, "user_name")}"
+    tenant_name = "${lookup(var.openstack, "tenant_name")}"
+    password  = "${lookup(var.openstack, "password")}"
+    auth_url  = "${lookup(var.openstack, "auth_url")}"
 }
