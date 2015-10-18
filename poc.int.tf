@@ -16,6 +16,18 @@ variable "defaults" {
   }
 }
 
+variable "rundeck" {
+  default = {
+    "host"          = "rundeck-01-alpha.amers2.cis.trcloud"
+    "username"      = "cloud"
+    "password"      = "WilyToad1"
+    "ressources"    = "/var/rundeck/projects/poc/etc/resources.yaml"
+    "keys"          = "/var/lib/rundeck/var/storage/content/keys"
+    "tags"          = "poc"
+  }
+}
+
+
 variable "hostnames" {
   default = {
     "0"         = "compass-int-poc-worker-01"
@@ -71,7 +83,7 @@ resource "openstack_blockstorage_volume_v1" "block_storage_2" {
 
 
 resource "openstack_lb_pool_v1" "lbaas_pool_1" {
-  name = "graphire_lbaas_pool_1"
+  name = "poc_lbaas_pool_1"
   region = "${lookup(var.defaults, "region")}"
   protocol = "HTTP"
   subnet_id = "${lookup(var.defaults, "lbaas_subnet")}"
@@ -80,19 +92,24 @@ resource "openstack_lb_pool_v1" "lbaas_pool_1" {
   member {
     address = "${element(openstack_compute_instance_v2.compute_worker.*.access_ip_v4, 0)}"
     port = 80
+    region = "${lookup(var.defaults, "region")}"
     admin_state_up = "true"
   }
   member {
     address = "${element(openstack_compute_instance_v2.compute_worker.*.access_ip_v4, 1)}"
     port = 80
+    region = "${lookup(var.defaults, "region")}"
     admin_state_up = "true"
   }
 }
 
 resource "openstack_lb_monitor_v1" "lbaas_monitor_1" {
   region = "${lookup(var.defaults, "region")}"	
-  type = "TCP"
-  delay = 30
+  type = "HTTP"
+  http_method = "GET"
+  expected_codes = "200"
+  url_path = "/"
+  delay = 10
   timeout = 5
   max_retries = 3
   admin_state_up = "true"
@@ -104,14 +121,15 @@ resource "openstack_networking_floatingip_v2" "lbaas_floatip_1" {
 }
 
 resource "openstack_lb_vip_v1" "lbaas_vip_1" {
+  depends_on = "openstack_networking_floatingip_v2.lbaas_floatip_1"
   name = "poc_webapp_vip"
   region = "${lookup(var.defaults, "region")}"
   subnet_id = "${lookup(var.defaults, "lbaas_subnet")}"
   protocol = "HTTP"
   port = 80
   pool_id = "${openstack_lb_pool_v1.lbaas_pool_1.id}"
-  # Not working...
-  #address = "${openstack_networking_floatingip_v2.lbaas_floatip_1.address}"
+  #floating_ip  = "${openstack_networking_floatingip_v2.lbaas_floatip_1.address}"
+  #address  = "${openstack_networking_floatingip_v2.lbaas_floatip_1.address}"
 }
 
 output "vip_address" {
@@ -144,27 +162,41 @@ resource "openstack_compute_instance_v2" "compute_worker" {
   admin_pass = "${lookup(var.defaults, "password")}"
   
   # This is where we would do CUDL registration, etc...
-  provisioner "local-exec" {
-        command = "export PYTHONPATH=/usr/lib64/python2.6/site-packages/pycrypto-2.6.1-py2.6-linux-x86_64.egg; python -c \"server_ip='${self.access_ip_v4}'; ${element(template_file.cda_automation.*.rendered, count.index)}\""
-  }
+ # provisioner "local-exec" {
+ #       command = "export PYTHONPATH=/usr/lib64/python2.6/site-packages/pycrypto-2.6.1-py2.6-linux-x86_64.egg; python -c \"server_ip='${self.access_ip_v4}'; ${element(template_file.cda_automation.*.rendered, count.index)}\""
+ # }
   
   # Doing stuff...
   provisioner "remote-exec" {
     connection {
-        user = "cloud"
+        user = "${lookup(var.defaults, "username")}"
         password = "${self.admin_pass}"
     }  
     inline = [
-     "sudo puppet agent -t",
+     #"sudo puppet agent -t",
      "sudo yum -y install httpd",
      "sudo /etc/init.d/httpd start",
 	 "sudo bash -c \"echo \\\"${element(template_file.index_html.*.rendered, count.index)}\\\" > /var/www/html/index.html\""
      ]
   }
+
+  # Creating run-deck nodes
+  provisioner "remote-exec" {
+    connection {
+        user = "${lookup(var.rundeck, "username")}"
+        password = "${lookup(var.rundeck, "password")}"
+        host = "${lookup(var.rundeck, "host")}"
+       
+    }
+    inline = [
+         "sudo bash -c 'printf \"${lookup(var.defaults, "password")}\" > \"${lookup(var.rundeck, "keys")}/cloud.password\"  ; for host in ${lookup(var.hostnames, count.index)}; do echo \"$host:\"; echo \"  hostname: ${self.access_ip_v4}\"; echo \"  username: ${lookup(var.defaults, "username")}\"; echo \"  ssh-password-storage-path: keys/cloud.password \"; echo \"  tags:\"; echo \"    - ${lookup(var.rundeck, "tags")}\" ; echo \"  ssh-authentication: password\"; echo \"  sudo-command-enabled: true\"; done >> ${lookup(var.rundeck, "ressources")};'"
+     ]
+  }
+
   
    provisioner "file" {
      connection {
-       user = "cloud"
+       user = "${lookup(var.defaults, "username")}"
        password = "${self.admin_pass}"
      }    
      source = "templates/index.tpl"
@@ -207,3 +239,10 @@ output debug_2 {
   value = "${template_file.cda_automation.1.rendered}"
 }
 
+output display_floating_ip {
+  value = "${openstack_networking_floatingip_v2.lbaas_floatip_1.address}"
+}
+
+output display_lb_pool {
+  value = "${openstack_lb_pool_v1.lbaas_pool_1.member.*}"
+}
