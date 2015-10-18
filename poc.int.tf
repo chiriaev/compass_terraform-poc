@@ -161,10 +161,10 @@ resource "openstack_compute_instance_v2" "compute_worker" {
   
   admin_pass = "${lookup(var.defaults, "password")}"
   
-  # This is where we would do CUDL registration, etc...
- # provisioner "local-exec" {
- #       command = "export PYTHONPATH=/usr/lib64/python2.6/site-packages/pycrypto-2.6.1-py2.6-linux-x86_64.egg; python -c \"server_ip='${self.access_ip_v4}'; ${element(template_file.cda_automation.*.rendered, count.index)}\""
- # }
+ # This is where we would do CUDL registration, etc...
+  provisioner "local-exec" {
+        command = "export PYTHONPATH=/usr/lib64/python2.6/site-packages/pycrypto-2.6.1-py2.6-linux-x86_64.egg; python -c \"server_ip='${self.access_ip_v4}'; ${element(template_file.cda_automation.*.rendered, count.index)}\""
+ }
   
   # Doing stuff...
   provisioner "remote-exec" {
@@ -173,7 +173,7 @@ resource "openstack_compute_instance_v2" "compute_worker" {
         password = "${self.admin_pass}"
     }  
     inline = [
-     #"sudo puppet agent -t",
+     "sudo puppet agent -t",
      "sudo yum -y install httpd",
      "sudo /etc/init.d/httpd start",
 	 "sudo bash -c \"echo \\\"${element(template_file.index_html.*.rendered, count.index)}\\\" > /var/www/html/index.html\""
